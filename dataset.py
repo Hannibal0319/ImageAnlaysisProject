@@ -84,7 +84,9 @@ class MVTecDataset(Dataset):
 
         return image, label, mask, os.path.basename(img_path)
 
-def get_dataloader(root_dir, category, split='train', batch_size=16, shuffle=True, resolution=256, num_workers=4, pin_memory=True):
+def get_dataloader(root_dir, category, split='train', batch_size=16, shuffle=True, resolution=256, num_workers=4, pin_memory=None, get_dataset=False):
+    if pin_memory is None:
+        pin_memory = torch.cuda.is_available()
     transform = transforms.Compose([
         transforms.Resize((resolution, resolution)),
         transforms.ToTensor(),
@@ -92,6 +94,9 @@ def get_dataloader(root_dir, category, split='train', batch_size=16, shuffle=Tru
     ])
     
     dataset = MVTecDataset(root_dir, category, split, transform)
+    
+    if get_dataset:
+        return dataset
     
     # Use persistent_workers if num_workers > 0 to keep the same processes alive across epochs
     dataloader = torch.utils.data.DataLoader(

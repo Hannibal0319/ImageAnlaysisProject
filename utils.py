@@ -78,3 +78,40 @@ def calculate_metrics(labels, scores):
     """Calculate ROC-AUC score."""
     auc = roc_auc_score(labels, scores)
     return auc
+
+def generate_synthetic_anomaly(images, p=0.5):
+    """
+    Randomly adds synthetic anomalies to a batch of images.
+    Returns:
+        corrupted_images: Tensor of the same shape as images
+        labels: Tensor (batch,) with 1 if anomaly was added, else 0
+    """
+    corrupted_images = images.clone()
+    batch_size, channels, h, w = images.shape
+    labels = torch.zeros(batch_size, device=images.device)
+    
+    for i in range(batch_size):
+        if torch.rand(1).item() < p:
+            # Add anomaly
+            labels[i] = 1.0
+            # Random patch size between 5% and 15% of image size
+            ph = torch.randint(int(h * 0.05), int(h * 0.15), (1,)).item()
+            pw = torch.randint(int(w * 0.05), int(w * 0.15), (1,)).item()
+            
+            # Random position
+            py = torch.randint(0, h - ph, (1,)).item()
+            px = torch.randint(0, w - pw, (1,)).item()
+            
+            # Randomly choose anomaly type: random noise, intensity shift, or zeroing out
+            anomaly_type = torch.randint(0, 3, (1,)).item()
+            if anomaly_type == 0:
+                # Random noise
+                corrupted_images[i, :, py:py+ph, px:px+pw] = torch.rand(channels, ph, pw, device=images.device)
+            elif anomaly_type == 1:
+                # Intensity shift
+                corrupted_images[i, :, py:py+ph, px:px+pw] += 0.5 * torch.randn(1, device=images.device)
+            else:
+                # Zeroing out (simulating a hole/obstruction)
+                corrupted_images[i, :, py:py+ph, px:px+pw] = 0
+                
+    return corrupted_images, labels

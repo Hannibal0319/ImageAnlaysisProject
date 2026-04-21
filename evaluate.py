@@ -7,6 +7,7 @@ import numpy as np
 from dataset import get_dataloader
 from model import get_model
 from utils import get_heatmap, plot_results, calculate_metrics
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 def evaluate(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -49,13 +50,23 @@ def evaluate(args):
                 save_path = os.path.join(args.result_dir, f"{args.category}_{i}_{names[0]}")
                 plot_results(images, reconstructions, masks, diff, overlay, save_path=save_path)
                 
-    # Calculate Metrics
-    auc = calculate_metrics(labels, anomaly_scores)
-    print(f"\n{args.category} Test AUC: {auc:.4f}")
+    # Binary classification based on anomaly score threshold
+    threshold = np.mean(anomaly_scores)
+    preds = (np.array(anomaly_scores) > threshold).astype(int)
+    true_labels = np.array(labels)
+    acc = accuracy_score(true_labels, preds)
+    prec = precision_score(true_labels, preds, zero_division=0)
+    rec = recall_score(true_labels, preds, zero_division=0)
+    f1 = f1_score(true_labels, preds, zero_division=0)
+    print(f"\n{args.category} Test Metrics:")
+    print(f"  Accuracy : {acc:.4f}")
+    print(f"  Precision: {prec:.4f}")
+    print(f"  Recall   : {rec:.4f}")
+    print(f"  F1 Score : {f1:.4f}")
     
-    # Save AUC to a file
+    # Save metrics to a file
     with open(os.path.join(args.result_dir, "metrics.txt"), "a") as f:
-        f.write(f"{args.category}: {auc:.4f}\n")
+        f.write(f"{args.category}: Accuracy={acc:.4f}, Precision={prec:.4f}, Recall={rec:.4f}, F1={f1:.4f}\n")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate CNN Autoencoder for Anomaly Detection")
