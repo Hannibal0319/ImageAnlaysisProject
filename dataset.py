@@ -14,11 +14,12 @@ class MVTecDataset(Dataset):
         split (str): 'train' or 'test'.
         transform (callable, optional): Optional transform to be applied on a sample.
     """
-    def __init__(self, root_dir, category, split='train', transform=None):
+    def __init__(self, root_dir, category, split='train', transform=None, resolution=256):
         self.root_dir = root_dir
         self.category = category
         self.split = split
         self.transform = transform
+        self.resolution = resolution
         
         self.image_paths = []
         self.labels = [] # 0 for good, 1 for anomaly
@@ -72,15 +73,15 @@ class MVTecDataset(Dataset):
             
         if mask_path:
             mask = Image.open(mask_path).convert('L')
-            # Use a slightly different transform for masks (Resize + ToTensor, no normalization)
+            # Use the specified resolution for masks
             mask_transform = transforms.Compose([
-                transforms.Resize((256, 256)), # Hardcoded for now to match default
+                transforms.Resize((self.resolution, self.resolution)),
                 transforms.ToTensor()
             ])
             mask = mask_transform(mask)
         else:
             # Return zero mask if none exists (all zeros for 'good')
-            mask = torch.zeros((1, 256, 256))
+            mask = torch.zeros((1, self.resolution, self.resolution))
 
         return image, label, mask, os.path.basename(img_path)
 
@@ -93,7 +94,7 @@ def get_dataloader(root_dir, category, split='train', batch_size=16, shuffle=Tru
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
     
-    dataset = MVTecDataset(root_dir, category, split, transform)
+    dataset = MVTecDataset(root_dir, category, split, transform, resolution=resolution)
     
     if get_dataset:
         return dataset
