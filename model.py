@@ -8,6 +8,8 @@ class FeatureExtractor(nn.Module):
         super(FeatureExtractor, self).__init__()
         # Use pre-trained ResNet18
         self.model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
+
+        
         
         # Freeze all parameters
         for param in self.model.parameters():

@@ -60,6 +60,7 @@ def build_memory_bank(args):
     os.makedirs(args.checkpoint_dir, exist_ok=True)
     save_path = os.path.join(args.checkpoint_dir, f"{args.category}_memory_bank.pth")
     
+    
     torch.save(memory_bank, save_path)
     print(f"Memory bank built successfully! Shape: {memory_bank.shape}")
     print(f"Saved to {save_path}")
