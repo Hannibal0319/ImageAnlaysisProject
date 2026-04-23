@@ -7,7 +7,7 @@ class FeatureExtractor(nn.Module):
     def __init__(self):
         super(FeatureExtractor, self).__init__()
         # Use pre-trained ResNet18
-        self.model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
+        self.model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1) # test
 
         
         
