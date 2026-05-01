@@ -32,32 +32,46 @@ class MVTecDataset(Dataset):
             self.labels = [0] * len(self.image_paths)
             self.mask_paths = [None] * len(self.image_paths)
         else:
-            # Test split contains both 'good' and various defect types
-            test_dir = os.path.join(root_dir, category, 'test')
-            gt_dir = os.path.join(root_dir, category, 'ground_truth')
-            
-            defect_types = sorted(os.listdir(test_dir))
-            for defect in defect_types:
-                img_subdir = os.path.join(test_dir, defect)
-                imgs = sorted(glob(os.path.join(img_subdir, "*.png")))
-                self.image_paths.extend(imgs)
-                
-                if defect == 'good':
-                    self.labels.extend([0] * len(imgs))
-                    self.mask_paths.extend([None] * len(imgs))
-                else:
-                    self.labels.extend([1] * len(imgs))
-                    # Corresponding ground truth masks
-                    mask_subdir = os.path.join(gt_dir, defect)
-                    for img_path in imgs:
-                        # Mask filenames usually append '_mask' before .png
-                        base_name = os.path.basename(img_path).replace(".png", "_mask.png")
-                        mask_path = os.path.join(mask_subdir, base_name)
-                        if os.path.exists(mask_path):
-                            self.mask_paths.append(mask_path)
+            # Check for MVTec AD 2 structure first
+            test_public_dir = os.path.join(root_dir, category, 'test_public')
+            if os.path.exists(test_public_dir):
+                # AD 2 structure: test_public/good, test_public/bad
+                for split_name, label in [('good', 0), ('bad', 1)]:
+                    img_subdir = os.path.join(test_public_dir, split_name)
+                    if os.path.exists(img_subdir):
+                        imgs = sorted(glob(os.path.join(img_subdir, "*.png")))
+                        self.image_paths.extend(imgs)
+                        self.labels.extend([label] * len(imgs))
+                        
+                        if label == 1:
+                            gt_dir = os.path.join(test_public_dir, 'ground_truth', 'bad')
+                            for img_path in imgs:
+                                base_name = os.path.basename(img_path).replace(".png", "_mask.png")
+                                mask_path = os.path.join(gt_dir, base_name)
+                                self.mask_paths.append(mask_path if os.path.exists(mask_path) else None)
                         else:
-                            # In some cases, masks might be missing or named differently
-                            self.mask_paths.append(None)
+                            self.mask_paths.extend([None] * len(imgs))
+            else:
+                # Original MVTec AD structure
+                test_dir = os.path.join(root_dir, category, 'test')
+                gt_dir = os.path.join(root_dir, category, 'ground_truth')
+                
+                defect_types = sorted(os.listdir(test_dir))
+                for defect in defect_types:
+                    img_subdir = os.path.join(test_dir, defect)
+                    imgs = sorted(glob(os.path.join(img_subdir, "*.png")))
+                    self.image_paths.extend(imgs)
+                    
+                    if defect == 'good':
+                        self.labels.extend([0] * len(imgs))
+                        self.mask_paths.extend([None] * len(imgs))
+                    else:
+                        self.labels.extend([1] * len(imgs))
+                        mask_subdir = os.path.join(gt_dir, defect)
+                        for img_path in imgs:
+                            base_name = os.path.basename(img_path).replace(".png", "_mask.png")
+                            mask_path = os.path.join(mask_subdir, base_name)
+                            self.mask_paths.append(mask_path if os.path.exists(mask_path) else None)
 
     def __len__(self):
         return len(self.image_paths)
@@ -75,6 +89,7 @@ class MVTecDataset(Dataset):
             mask = Image.open(mask_path).convert('L')
             # Use the specified resolution for masks
             mask_transform = transforms.Compose([
+                PadToSquare(),
                 transforms.Resize((self.resolution, self.resolution)),
                 transforms.ToTensor()
             ])
@@ -85,10 +100,24 @@ class MVTecDataset(Dataset):
 
         return image, label, mask, os.path.basename(img_path)
 
+# Custom transform to pad to square before resizing
+class PadToSquare(object):
+    def __call__(self, img):
+        w, h = img.size
+        if w == h: return img
+        max_size = max(w, h)
+        padding_w = (max_size - w) // 2
+        padding_h = (max_size - h) // 2
+        # (left, top, right, bottom)
+        padding = (padding_w, padding_h, max_size - w - padding_w, max_size - h - padding_h)
+        return transforms.functional.pad(img, padding, fill=0, padding_mode='constant')
+
 def get_dataloader(root_dir, category, split='train', batch_size=16, shuffle=True, resolution=256, num_workers=4, pin_memory=None, get_dataset=False):
     if pin_memory is None:
         pin_memory = torch.cuda.is_available()
+    
     transform = transforms.Compose([
+        PadToSquare(),
         transforms.Resize((resolution, resolution)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])

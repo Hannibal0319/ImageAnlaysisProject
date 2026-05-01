@@ -29,8 +29,8 @@ def plot_results(img, mask, anomaly_map, overlay, save_path=None):
     """Plot original, ground truth, anomaly map, and localization."""
     fig, axes = plt.subplots(1, 4, figsize=(16, 4))
     
-    img_np = denormalize(img[0]).permute(1, 2, 0).cpu().numpy()
-    mask_np = mask[0, 0].cpu().numpy()
+    img_np = denormalize(img).permute(1, 2, 0).cpu().numpy()
+    mask_np = mask[0].cpu().numpy() if mask.ndim == 3 else mask.cpu().numpy()
     
     axes[0].imshow(img_np)
     axes[0].set_title("Original")
