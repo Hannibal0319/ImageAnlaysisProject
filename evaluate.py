@@ -103,9 +103,9 @@ def evaluate(args):
             # Extract features (multi-scale)
             features = model(images)
             
-            # Aggregate spatial context (3x3 average pooling)
+            # Aggregate spatial context (5x5 average pooling for granulated textures)
             for j, f in enumerate(features):
-                f_pooled = F.avg_pool2d(f, 3, stride=1, padding=1)
+                f_pooled = F.avg_pool2d(f, 5, stride=1, padding=2)
                 features[j] = f_pooled
             
             # Combine features (Upsample Layer 3 to Layer 2 resolution)
@@ -113,18 +113,15 @@ def evaluate(args):
             f2_up = F.interpolate(f2, size=f1.shape[-2:], mode='bilinear', align_corners=False)
             combined = torch.cat([f1, f2_up], dim=1) 
             
-            # L2 Normalize features along the channel dimension
-            combined = F.normalize(combined, p=2, dim=1)
-            
             h_feat, w_feat = combined.shape[-2:]
             test_features = combined.permute(0, 2, 3, 1).reshape(-1, combined.shape[1]).cpu().numpy()
             
             # Find distances to the 9 nearest normal neighbors
             distances, _ = knn.kneighbors(test_features) # [H*W, 9]
             
-            # Robust Image Score: Weighted Top-0.1% of patch scores (Finer focus for AD 2)
+            # Robust Image Score: Weighted Top-1% of patch scores (More robust for granulated textures)
             patch_scores = distances[:, 0]
-            top_k = max(1, int(len(patch_scores) * 0.001))
+            top_k = max(1, int(len(patch_scores) * 0.01))
             top_scores = np.sort(patch_scores)[-top_k:]
             
             # Find the index of the absolute max for weighting
@@ -139,6 +136,13 @@ def evaluate(args):
             # Upsample anomaly map
             anomaly_map_resized = cv2.resize(anomaly_map, (args.resolution, args.resolution), interpolation=cv2.INTER_LINEAR)
             anomaly_map_resized = cv2.GaussianBlur(anomaly_map_resized, (3, 3), 0)
+            
+            # Background Masking (Suppress noise in black padding)
+            # images[0] is [3, H, W], normalized.
+            # Convert to intensity and threshold
+            img_intensity = torch.mean(images[0], dim=0).cpu().numpy()
+            foreground_mask = (img_intensity > -1.5).astype(np.float32) # Normalized images have negative values
+            anomaly_map_resized = anomaly_map_resized * foreground_mask
             
             image_scores.append(image_score)
             image_labels.append(label.item())
@@ -228,7 +232,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate Frozen Feature Matching for Anomaly Detection")
     parser.add_argument("--root_dir", type=str, default="mvtec_ad", help="Path to MVTec AD dataset")
     parser.add_argument("--category", type=str, default="bottle", help="Category to evaluate")
-    parser.add_argument("--resolution", type=int, default=384, help="Image resolution")
+    parser.add_argument("--resolution", type=int, default=256, help="Image resolution")
     parser.add_argument("--checkpoint_dir", type=str, default="checkpoints", help="Directory where memory bank is saved")
     parser.add_argument("--result_dir", type=str, default="results", help="Directory to save evaluation results")
     

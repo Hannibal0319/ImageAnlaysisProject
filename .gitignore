@@ -3,3 +3,5 @@ checkpoints/
 runs/
 results/
 __pycache__/
+submission/
+error_analysis/

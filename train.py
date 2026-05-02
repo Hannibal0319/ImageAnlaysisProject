@@ -36,18 +36,15 @@ def build_memory_bank(args):
             # Extract multi-scale feature maps [Layer 2, Layer 3]
             features = model(images)
             
-            # Aggregate spatial context (3x3 average pooling)
+            # Aggregate spatial context (5x5 average pooling for granulated textures)
             for i, f in enumerate(features):
-                f_pooled = nn.AvgPool2d(3, stride=1, padding=1)(f)
+                f_pooled = nn.AvgPool2d(5, stride=1, padding=2)(f)
                 features[i] = f_pooled
             
             # Combine features (Upsample Layer 3 to Layer 2 resolution)
             f1, f2 = features
             f2_up = F.interpolate(f2, size=f1.shape[-2:], mode='bilinear', align_corners=False)
             combined = torch.cat([f1, f2_up], dim=1) 
-            
-            # L2 Normalize features along the channel dimension to be robust to illumination changes
-            combined = F.normalize(combined, p=2, dim=1)
             
             # Reshape to [B*H*W, C] (One vector per patch)
             combined = combined.permute(0, 2, 3, 1).reshape(-1, combined.shape[1])
@@ -74,7 +71,7 @@ if __name__ == "__main__":
     parser.add_argument("--root_dir", type=str, default="mvtec_ad", help="Path to MVTec AD dataset")
     parser.add_argument("--category", type=str, default="bottle", help="Category to process")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
-    parser.add_argument("--resolution", type=int, default=384, help="Image resolution")
+    parser.add_argument("--resolution", type=int, default=256, help="Image resolution")
     parser.add_argument("--checkpoint_dir", type=str, default="checkpoints", help="Directory for artifacts")
     parser.add_argument("--num_workers", type=int, default=multiprocessing.cpu_count() // 2, help="Dataloader workers")
     
