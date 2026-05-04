@@ -1,35 +1,90 @@
 import torch
 import torch.nn as nn
-import torchvision.models as models
 import torch.nn.functional as F
 
-class FeatureExtractor(nn.Module):
+
+class CustomAutoencoder(nn.Module):
     def __init__(self):
-        super(FeatureExtractor, self).__init__()
-        # Use pre-trained ResNet18
-        self.model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1) # test
+        super(CustomAutoencoder, self).__init__()
 
-        
-        
-        # Freeze all parameters
-        for param in self.model.parameters():
-            param.requires_grad = False
-            
-        self.model.eval()
-        
-        self.captured_features = []
-        # Register hooks to extract intermediate Layer 2 and Layer 3 features
-        self.model.layer2.register_forward_hook(self.hook_fn)
-        self.model.layer3.register_forward_hook(self.hook_fn)
+        # Encoder
+        self.enc1 = nn.Sequential(
+            nn.Conv2d(3, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.MaxPool2d(2)
+        )
 
-    def hook_fn(self, module, input, output):
-        self.captured_features.append(output)
+        self.enc2 = nn.Sequential(
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d(2)
+        )
+
+        self.enc3 = nn.Sequential(
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.MaxPool2d(2)
+        )
+
+        # Decoder
+        self.dec3 = nn.Sequential(
+            nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2),
+            nn.ReLU()
+        )
+
+        self.dec2 = nn.Sequential(
+            nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2),
+            nn.ReLU()
+        )
+
+        self.dec1 = nn.Sequential(
+            nn.ConvTranspose2d(32, 3, kernel_size=2, stride=2),
+            #nn.Sigmoid() this might need to be activated depending on the input normalization
+        )
+
+    def encode(self, x):
+        f1 = self.enc1(x)
+        f2 = self.enc2(f1)
+        f3 = self.enc3(f2)
+        return f2, f3
 
     def forward(self, x):
-        self.captured_features = []
-        _ = self.model(x)
-        return self.captured_features
+        f1 = self.enc1(x)
+        f2 = self.enc2(f1)
+        f3 = self.enc3(f2)
+
+        x = self.dec3(f3)
+        x = self.dec2(x)
+        x = self.dec1(x)
+
+        return x
+
+
+class CustomCNNFeatureExtractor(nn.Module):
+    def __init__(self, checkpoint_path=None):
+        super(CustomCNNFeatureExtractor, self).__init__()
+
+        autoencoder = CustomAutoencoder()
+
+        if checkpoint_path is not None:
+            autoencoder.load_state_dict(torch.load(checkpoint_path, map_location="cpu"))
+
+        self.enc1 = autoencoder.enc1
+        self.enc2 = autoencoder.enc2
+        self.enc3 = autoencoder.enc3
+
+    def forward(self, x):
+        f1 = self.enc1(x)
+        f2 = self.enc2(f1)
+        f3 = self.enc3(f2)
+
+        return [f2, f3]
+
 
 def get_model():
-    """Returns the frozen, pre-trained feature extractor."""
-    return FeatureExtractor()
+    return CustomCNNFeatureExtractor(
+        checkpoint_path="checkpoints/custom_autoencoder.pth"
+    )
