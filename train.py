@@ -23,12 +23,12 @@ def build_memory_bank(args):
     )
     
     # Load frozen feature extractor
-    model = get_model().to(device)
+    model = get_model(args.model).to(device)
     model.eval()
     
     memory_bank = []
     
-    print(f"Building frozen memory bank for {args.category}...")
+    print(f"Building frozen memory bank for {args.category} using {args.model}...")
     with torch.no_grad():
         for images, _, _, _ in tqdm(dataloader, desc="Extracting features"):
             images = images.to(device)
@@ -59,7 +59,7 @@ def build_memory_bank(args):
     
     # Create checkpoints directory and save
     os.makedirs(args.checkpoint_dir, exist_ok=True)
-    save_path = os.path.join(args.checkpoint_dir, f"{args.category}_memory_bank.pth")
+    save_path = os.path.join(args.checkpoint_dir, f"{args.category}_{args.model}_memory_bank.pth")
     
     
     torch.save(memory_bank, save_path)
@@ -74,6 +74,7 @@ if __name__ == "__main__":
     parser.add_argument("--resolution", type=int, default=256, help="Image resolution")
     parser.add_argument("--checkpoint_dir", type=str, default="checkpoints", help="Directory for artifacts")
     parser.add_argument("--num_workers", type=int, default=multiprocessing.cpu_count() // 2, help="Dataloader workers")
+    parser.add_argument("--model", type=str, default="resnet18", help="Model type: resnet18 or custom_autoencoder")
     
     args = parser.parse_args()
     build_memory_bank(args)

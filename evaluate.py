@@ -71,11 +71,11 @@ def evaluate(args):
     dataloader = get_dataloader(args.root_dir, args.category, split='test', batch_size=1, shuffle=False, resolution=args.resolution)
     
     # Load Frozen Feature Extractor
-    model = get_model().to(device)
+    model = get_model(args.model).to(device)
     model.eval()
     
     # Load Memory Bank
-    bank_path = os.path.join(args.checkpoint_dir, f"{args.category}_memory_bank.pth")
+    bank_path = os.path.join(args.checkpoint_dir, f"{args.category}_{args.model}_memory_bank.pth")
     if not os.path.exists(bank_path):
         print(f"Memory bank not found at {bank_path}. Please build it first using train.py.")
         return
@@ -95,7 +95,7 @@ def evaluate(args):
     
     os.makedirs(args.result_dir, exist_ok=True)
     
-    print(f"Evaluating {args.category} (Improved PatchCore)...")
+    print(f"Evaluating {args.category} (Model: {args.model})...")
     with torch.no_grad():
         for i, (images, label, masks, names) in enumerate(tqdm(dataloader)):
             images = images.to(device)
@@ -235,6 +235,7 @@ if __name__ == "__main__":
     parser.add_argument("--resolution", type=int, default=256, help="Image resolution")
     parser.add_argument("--checkpoint_dir", type=str, default="checkpoints", help="Directory where memory bank is saved")
     parser.add_argument("--result_dir", type=str, default="results", help="Directory to save evaluation results")
+    parser.add_argument("--model", type=str, default="resnet18", help="Model type: resnet18 or autoencoder")
     
     args = parser.parse_args()
     evaluate(args)
