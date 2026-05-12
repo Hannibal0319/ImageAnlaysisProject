@@ -29,7 +29,7 @@ class CustomAutoencoder(nn.Module):
             nn.MaxPool2d(2)
         )
 
-        self.enc3 = nn.Sequential(
+        self.enc3 = nn.Sequential( #test
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(),
